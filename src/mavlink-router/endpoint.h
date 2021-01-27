@@ -183,6 +183,7 @@ public:
     int open(const char *ip, unsigned long port, bool bind = false);
 
     struct sockaddr_in sockaddr;
+    struct sockaddr_in sockaddr_send;
 #ifdef ENABLE_IPV6
     struct sockaddr_in6 sockaddr6;
     bool is_ipv6;

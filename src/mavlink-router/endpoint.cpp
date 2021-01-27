@@ -328,6 +328,7 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
     if (has_sys_comp_id(src_sysid, src_compid))
         return false;
 
+
     if (msg_id != UINT32_MAX && 
         _message_filter.size() > 0 && 
         std::find(_message_filter.begin(), _message_filter.end(), msg_id) == _message_filter.end()) {
@@ -335,6 +336,12 @@ bool Endpoint::accept_msg(int target_sysid, int target_compid, uint8_t src_sysid
         // if filter is defined and message is not in the set then discard it
         return false;
     }
+
+    // send message to all if it is a status update
+    if (msg_id == 253||  msg_id == 47){
+       return true;
+     }
+
 
     // Message is broadcast on sysid or sysid is non-existent: accept msg
     if (target_sysid == 0 || target_sysid == -1)
@@ -747,6 +754,7 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 #endif
     fd = socket(AF_INET, SOCK_DGRAM, 0);
 
+
 #ifdef ENABLE_IPV6
     }
 #endif
@@ -790,11 +798,18 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = inet_addr(ip);
     sockaddr.sin_port = htons(port);
+
+    sockaddr_send.sin_family = AF_INET;
+    sockaddr_send.sin_addr.s_addr = inet_addr(ip);
+    sockaddr_send.sin_port = htons(port);
+
+
 #ifdef ENABLE_IPV6
     }
 #endif
 
     if (to_bind) {
+    	log_info("binding port");
 #ifdef ENABLE_IPV6
         if (this->is_ipv6) {
             if (bind(fd, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6)) < 0) {
@@ -812,13 +827,13 @@ int UdpEndpoint::open(const char *ip, unsigned long port, bool to_bind)
 #endif
     } else {
         if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast_val, sizeof(broadcast_val))) {
-            log_error("Error enabling broadcast in socket (%m)");
+        	log_info("Error enabling broadcast in socket (%m)");
             goto fail;
         }
     }
 
     if (fcntl(fd, F_SETFL, O_NONBLOCK | FASYNC) < 0) {
-        log_error("Error setting socket fd as non-blocking (%m)");
+    	log_info("Error setting socket fd as non-blocking (%m)");
         goto fail;
     }
 
@@ -849,6 +864,8 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
 {
     socklen_t addrlen = sizeof(sockaddr);
     ssize_t r = 0;
+    //in_addr broadcast_address = sockaddr.sin_addr;
+
 #ifdef ENABLE_IPV6
     if (this->is_ipv6) {
         addrlen = sizeof(sockaddr6);
@@ -864,6 +881,9 @@ ssize_t UdpEndpoint::_read_msg(uint8_t *buf, size_t len)
         return 0;
     if (r == -1)
         return -errno;
+    //sockaddr.sin_addr = broadcast_address;
+//    char buffer[INET_ADDRSTRLEN];
+//    inet_ntop( AF_INET, &sockaddr.sin_addr, buffer, sizeof( buffer ));
 
     return r;
 }
@@ -885,11 +905,11 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
     if (is_ipv6) {
         sock_connected = sockaddr6.sin6_port != 0;
     } else {
-        sock_connected = sockaddr.sin_port != 0;
+        sock_connected = sockaddr_send.sin_port != 0;
     }
     if (!sock_connected) {
 #else
-    if (!sockaddr.sin_port) {
+    if (!sockaddr_send.sin_port) {
 #endif
         log_debug("No one ever connected to %d. No one to write for", fd);
         return 0;
@@ -901,7 +921,7 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr6, sizeof(sockaddr6));
     } else {
 #endif
-    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+    r = ::sendto(fd, pbuf->data, pbuf->len, 0, (struct sockaddr *)&sockaddr_send, sizeof(sockaddr_send));
 #ifdef ENABLE_IPV6
     }
 #endif
@@ -920,6 +940,9 @@ int UdpEndpoint::write_msg(const struct buffer *pbuf)
         _incomplete_msgs++;
         log_debug("Discarding packet, incomplete write %zd but len=%u", r, pbuf->len);
     }
+//    char buffer[INET_ADDRSTRLEN];
+//    inet_ntop( AF_INET, &sockaddr.sin_addr, buffer, sizeof( buffer ));
+//    printf("innet address send = %s \n", buffer);
 
     log_debug("UDP [%d] wrote %zd bytes", fd, r);
 

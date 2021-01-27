@@ -334,6 +334,7 @@ void LogEndpoint::stop()
 
 bool LogEndpoint::start()
 {
+	log_warning("Log  started");
     if (_file != -1) {
         log_warning("Log already started");
         return false;

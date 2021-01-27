@@ -163,6 +163,8 @@ void Mainloop::route_msg(struct buffer *buf, int target_sysid, int target_compid
         }
     }
 
+
+
     if (unknown) {
         _errors_aggregate.msg_to_unknown++;
         log_debug("Message %u to unknown sysid/compid: %u/%u", msg_id, target_sysid, target_compid);
@@ -409,7 +411,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
                 return false;
             }
 
-            if (conf->filter) {
+            if (false || conf->filter) {
                 char *token = strtok(conf->filter, ",");
                 while (token != NULL) {
                     udp->add_message_to_filter(atoi(token));
@@ -450,6 +452,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         g_tcp_fd = tcp_open(opt->tcp_port);
 
     if (opt->logs_dir) {
+    	log_info("logging endpoints");
         if (opt->mavlink_dialect == Ardupilotmega) {
             _log_endpoint
                 = new BinLog(opt->logs_dir, opt->log_mode, opt->min_free_space, opt->max_log_files);
@@ -459,6 +462,7 @@ bool Mainloop::add_endpoints(Mainloop &mainloop, struct options *opt)
         } else {
             _log_endpoint = new AutoLog(opt->logs_dir, opt->log_mode, opt->min_free_space,
                                         opt->max_log_files);
+
         }
         _log_endpoint->mark_unfinished_logs();
         g_endpoints[i] = _log_endpoint;
